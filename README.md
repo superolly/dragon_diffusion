@@ -1,7 +1,7 @@
-This repo will soon be an unofficial implementation of DragonDiffusion.
+This repo will soon be an unofficial implementation of "DragonDiffusion: Enabling Drag-style Manipulation on Diffusion Models" (Mou et al., 2023).
 
-### TODO 
-- [ ] Generate masks for both a generated and a 'real' image 
-- [ ] Null text inversion 
+### TODO
+- [ ] Generate masks for both a generated and a 'real' image
+- [ ] Null text inversion
 - [ ] Basic Dragon Diffusion loop for one type of edit 
-- [ ] Complete suite of edits 
+- [ ] Complete suite of edits
