@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "dragon_diffusion"
+  site-url: "https://stroopwafl.github.io/dragon_diffusion"
+  description: "Implementation of DragonDiffusion (Mou et al., 2023)"
+  repo-branch: main
+  repo-url: "https://github.com/stroopwafl/dragon_diffusion"
