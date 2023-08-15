@@ -1,3 +1,7 @@
+# DragonDiffusion
+
+Rawr.
+
 This repo will soon be an unofficial implementation of "DragonDiffusion: Enabling Drag-style Manipulation on Diffusion Models" (Mou et al., 2023).
 
 ### TODO
