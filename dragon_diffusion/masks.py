@@ -12,7 +12,6 @@ from glob import glob
 
 from torch import tensor, nn, optim
 import torch.nn.functional as F
-from tqdm.auto import tqdm
 import torchvision.transforms.functional as TF
 from torch.optim import lr_scheduler
 from diffusers import UNet2DModel
@@ -37,10 +36,10 @@ mpl.rcParams['image.cmap'] = 'gray_r'
 # %% auto 0
 __all__ = ['get_embeddings', 'sample_original', 'process', 'to_pil', 'encode_text', 'encode_img', 'return_mask_img', 'load_img',
            'decode_img', 'sample_with_img', 'compute_mask', 'improve_mask', 'improve_mask_2', 'plot_images',
-           'diffedit_mask', 'show_mask', 'show_points']
+           'diffedit_mask', 'show_mask', 'show_points', 'get_sam_predictor', 'get_sam_mask']
 
 # %% ../nbs/01_masks.ipynb 4
-def get_embeddings(prompt, concat_unconditional=False, device='cpu'):
+def get_embeddings(prompt, text_encoder, tokenizer, concat_unconditional=False, device='cpu'):
     text_input = tokenizer(prompt, padding="max_length", max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")
     max_length = text_input.input_ids.shape[-1]
     with torch.no_grad():
@@ -52,9 +51,9 @@ def get_embeddings(prompt, concat_unconditional=False, device='cpu'):
     return embeds.to(device)
 
 # %% ../nbs/01_masks.ipynb 5
-def sample_original(prompt, seed=None, height=512, width=512, steps=50, guidance_scale=5, device='cuda'):
+def sample_original(prompt, text_encoder, tokenizer, seed=None, height=512, width=512, steps=50, guidance_scale=5, device='cuda'):
     if seed is None: seed = int(torch.rand((1,)) * 1000000)
-    embeddings = get_embeddings(prompt, concat_unconditional=True, device=device)
+    embeddings = get_embeddings(prompt, text_encoder, tokenizer, concat_unconditional=True, device=device)
     scheduler.set_timesteps(steps)
     shape = (1, model.in_channels, height // 8, width // 8)
     latents = torch.randn(shape, generator=torch.manual_seed(seed)).to(device)
@@ -83,13 +82,13 @@ def to_pil(image):
     return Image.fromarray(image.cpu().permute(1,2,0).numpy().astype('uint8'))
 
 # %% ../nbs/01_masks.ipynb 11
-def encode_text(prompt):
+def encode_text(prompt, text_encoder):
     tokens = tokenizer(prompt, padding="max_length", max_length=tokenizer.model_max_length, truncation=True, return_tensors="pt")
     embedding = text_encoder(tokens.input_ids)[0]
     return embedding
 
 # %% ../nbs/01_masks.ipynb 12
-def encode_img(file_path, height, width, device='cuda', concat=None):
+def encode_img(file_path, height, width, vae, device='cuda', concat=None):
     img = load_img(file_path, height, width)
     im_tensor = transforms.ToTensor()(img).unsqueeze(0).to(device)
     if concat: im_tensor = torch.cat([im_tensor]*concat, dim=1)
@@ -108,7 +107,7 @@ def load_img(file_path, height, width, return_tensor=False, device='cpu'):
     return image
 
 # %% ../nbs/01_masks.ipynb 15
-def decode_img(latent):
+def decode_img(latent, vae):
     if not latent.device == vae.device: latent = latent.to(vae.device)
     with torch.no_grad():
         img = vae.decode(1 / 0.18215 * latent).sample
@@ -118,14 +117,14 @@ def decode_img(latent):
     return Image.fromarray(img[0])
 
 # %% ../nbs/01_masks.ipynb 16
-def sample_with_img(prompt, img_path, seed=None, height=512, width=512, steps=50, guidance_scale=5, device='cuda', compute_mask=False, start_step=0):
+def sample_with_img(prompt, img_path, text_encoder, tokenizer, model, scheduler, vae, seed=None, height=512, width=512, steps=50, guidance_scale=5, device='cuda', compute_mask=False, start_step=0):
     
     if seed is None: seed = int(torch.rand((1,)) * 1000000)
-    embeddings = get_embeddings(prompt, concat_unconditional=True, device=device)
+    embeddings = get_embeddings(prompt, text_encoder, tokenizer, concat_unconditional=True, device=device)
     scheduler.set_timesteps(steps)
     
     shape = (1, model.in_channels, height // 8, width // 8)
-    init_latents = encode_img(img_path, height, width)
+    init_latents = encode_img(img_path, height, width, vae)
     scheduler.set_timesteps(steps)
     noise = torch.randn(shape).to('cuda') * 0.5
     latents = scheduler.add_noise(
@@ -145,18 +144,18 @@ def sample_with_img(prompt, img_path, seed=None, height=512, width=512, steps=50
             noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
             latents = scheduler.step(noise_pred, t, latents).prev_sample
         
-    image = decode_img(latents)
+    image = decode_img(latents, vae)
     if compute_mask: return latents.detach().cpu()
     return image
 
 # %% ../nbs/01_masks.ipynb 17
-def compute_mask(edit_text, ref_text, img, steps=70, guidance_scale=5, start_step=25, n=10):
+def compute_mask(edit_text, ref_text, img, text_encoder, tokenizer, model, scheduler, vae, steps=70, guidance_scale=5, start_step=25, n=10):
     
     diffs = []
     
     for i in progress_bar(range(n)):
-        e_pred = sample_with_img(edit_text, img, steps=steps, seed=i, start_step=start_step, compute_mask=True)[0]
-        r_pred = sample_with_img(ref_text, img, steps=steps, seed=i, start_step=start_step, compute_mask=True)[0]
+        e_pred = sample_with_img(edit_text, img, text_encoder, tokenizer, model, scheduler, vae, steps=steps, seed=i, start_step=start_step, compute_mask=True)[0]
+        r_pred = sample_with_img(ref_text, img, text_encoder, tokenizer, model, scheduler, vae, steps=steps, seed=i, start_step=start_step, compute_mask=True)[0]
         distance = np.array(e_pred) - np.array(r_pred)
         diffs.append(distance)
         
@@ -226,7 +225,7 @@ def plot_images(init_img, mask_img):
 def diffedit_mask(edit_text, ref_text, img, n=10, seed=None, erosion_it=10, dilation_it=16):
     
     # compute mask
-    mask = compute_mask(edit_text, ref_text, img, n=n, start_step=25, steps=50)
+    mask = compute_mask(edit_text, ref_text, img, text_encoder, tokenizer, model, scheduler, vae, n=n, start_step=25, steps=50)
     mask_img = return_mask_img(mask)
     mask_path = "/home/mask.jpg"
     mask_img.save(mask_path, 0)
@@ -256,6 +255,38 @@ def show_points(coords, labels, ax, marker_size=375):
     ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
     ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
 
-# %% ../nbs/01_masks.ipynb 31
-#| export
+# %% ../nbs/01_masks.ipynb 38
+def get_sam_predictor(ckpt_path:str, model_type:str, device:str='cuda'):
+    """Returns a SAM predictor object."""
+    sys.path.append("..")
+    sam = sam_model_registry[model_type](checkpoint=sam_checkpoint)
+    sam.to(device)
+    return SamPredictor(sam)
 
+# %% ../nbs/01_masks.ipynb 39
+def get_sam_mask(image, predictor, input_point: List[List[int]], plot=False):
+    """Returns a set of predicted masks for a single input point."""
+    input_point = np.array([input_point[0]])
+    input_label = np.array([1])
+    masks, scores, logits = predictor.predict(
+        point_coords=input_point,
+        point_labels=input_label,
+        multimask_output=True,
+    )
+    if len(input_point) > 1:
+        input_point = np.array(input_point)
+        mask_input = logits[np.argmax(scores), :, :]
+        masks, _, _ = predictor.predict(
+            point_coords=input_point,
+            point_labels=input_label,
+            mask_input=mask_input[None, :, :],
+            multimask_output=True,
+        )
+    if plot:
+        fig, ax = plt.subplots(1,len(masks)+1, figsize=(12,4))
+        show_points(input_point, input_label, ax[0])
+        ax[0].imshow(image)
+        for i in range(1, len(masks) + 1):
+            ax[i].imshow(image)
+            show_mask(masks[i-1], ax[i])
+    return masks

@@ -26,7 +26,7 @@ def show_image(im, ax=None, figsize=None, title=None, noframe=True, **kwargs):
     if noframe: ax.axis('off')
     return ax
 
-# %% ../nbs/00_core.ipynb 5
+# %% ../nbs/00_core.ipynb 4
 @fc.delegates(plt.subplots, keep=True)
 def subplots(
     nrows:int=1, # Number of rows in returned axes grid
@@ -44,7 +44,7 @@ def subplots(
     return fig,ax
 
 # %% ../nbs/00_core.ipynb 6
-@fc.delegates(plt.subplots)
+@fc.delegates(subplots)
 def show_images(ims:list, # Images to show
                 nrows:int=None, # Number of rows in grid
                 ncols:int=None, # Number of columns in grid (auto-calculated if None)
