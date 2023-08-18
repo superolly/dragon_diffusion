@@ -36,7 +36,7 @@ mpl.rcParams['image.cmap'] = 'gray_r'
 # %% auto 0
 __all__ = ['get_embeddings', 'sample_original', 'process', 'to_pil', 'encode_text', 'encode_img', 'return_mask_img', 'load_img',
            'decode_img', 'sample_with_img', 'compute_mask', 'improve_mask', 'improve_mask_2', 'plot_images',
-           'diffedit_mask', 'show_mask', 'show_points', 'get_sam_predictor', 'get_sam_mask']
+           'ModelNamespace', 'diffedit_mask', 'show_mask', 'show_points', 'get_sam_predictor', 'get_sam_mask']
 
 # %% ../nbs/01_masks.ipynb 4
 def get_embeddings(prompt, text_encoder, tokenizer, concat_unconditional=False, device='cpu'):
@@ -222,10 +222,17 @@ def plot_images(init_img, mask_img):
     axs[2].set_title(f"Mask overlay")
 
 # %% ../nbs/01_masks.ipynb 21
-def diffedit_mask(edit_text, ref_text, img, n=10, seed=None, erosion_it=10, dilation_it=16):
+from types import SimpleNamespace
+
+# %% ../nbs/01_masks.ipynb 22
+class ModelNamespace(SimpleNamespace):
+    def __init__(self, unet, scheduler, vae, tokenizer, text_encoder): fc.store_attr()
+
+# %% ../nbs/01_masks.ipynb 23
+def diffedit_mask(edit_text, ref_text, img, pipe:ModelNamespace, n=10, seed=None, erosion_it=10, dilation_it=16):
     
     # compute mask
-    mask = compute_mask(edit_text, ref_text, img, text_encoder, tokenizer, model, scheduler, vae, n=n, start_step=25, steps=50)
+    mask = compute_mask(edit_text, ref_text, img, pipe.text_encoder, pipe.tokenizer, pipe.unet, pipe.scheduler, pipe.vae, n=n, start_step=25, steps=50)
     mask_img = return_mask_img(mask)
     mask_path = "/home/mask.jpg"
     mask_img.save(mask_path, 0)
@@ -238,10 +245,10 @@ def diffedit_mask(edit_text, ref_text, img, n=10, seed=None, erosion_it=10, dila
     
     return 
 
-# %% ../nbs/01_masks.ipynb 26
+# %% ../nbs/01_masks.ipynb 28
 from segment_anything import sam_model_registry, SamPredictor
 
-# %% ../nbs/01_masks.ipynb 27
+# %% ../nbs/01_masks.ipynb 29
 def show_mask(mask, ax, random_color=False):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
@@ -251,14 +258,14 @@ def show_mask(mask, ax, random_color=False):
     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
     ax.imshow(mask_image)
 
-# %% ../nbs/01_masks.ipynb 28
+# %% ../nbs/01_masks.ipynb 30
 def show_points(coords, labels, ax, marker_size=375):
     pos_points = coords[labels==1]
     neg_points = coords[labels==0]
     ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
     ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
 
-# %% ../nbs/01_masks.ipynb 39
+# %% ../nbs/01_masks.ipynb 41
 def get_sam_predictor(ckpt_path:str, model_type:str, device:str='cuda'):
     """Returns a SAM predictor object."""
     sys.path.append("..")
@@ -266,7 +273,7 @@ def get_sam_predictor(ckpt_path:str, model_type:str, device:str='cuda'):
     sam.to(device)
     return SamPredictor(sam)
 
-# %% ../nbs/01_masks.ipynb 40
+# %% ../nbs/01_masks.ipynb 42
 def get_sam_mask(image, predictor, input_point: List[List[int]], plot=False):
     """Returns a set of predicted masks for a single input point."""
     input_point = np.array([input_point[0]])
