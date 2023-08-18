@@ -30,4 +30,10 @@ d = { 'settings': { 'branch': 'main',
                                                                                     'dragon_diffusion/masks.py'),
                                         'dragon_diffusion.masks.show_mask': ('masks.html#show_mask', 'dragon_diffusion/masks.py'),
                                         'dragon_diffusion.masks.show_points': ('masks.html#show_points', 'dragon_diffusion/masks.py'),
-                                        'dragon_diffusion.masks.to_pil': ('masks.html#to_pil', 'dragon_diffusion/masks.py')}}}
+                                        'dragon_diffusion.masks.to_pil': ('masks.html#to_pil', 'dragon_diffusion/masks.py')},
+            'dragon_diffusion.nulltext': { 'dragon_diffusion.nulltext.ddim_inversion': ( 'nulltext.html#ddim_inversion',
+                                                                                         'dragon_diffusion/nulltext.py'),
+                                           'dragon_diffusion.nulltext.null_text_inversion': ( 'nulltext.html#null_text_inversion',
+                                                                                              'dragon_diffusion/nulltext.py'),
+                                           'dragon_diffusion.nulltext.reconstruct': ( 'nulltext.html#reconstruct',
+                                                                                      'dragon_diffusion/nulltext.py')}}}

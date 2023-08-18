@@ -239,6 +239,9 @@ def diffedit_mask(edit_text, ref_text, img, n=10, seed=None, erosion_it=10, dila
     return 
 
 # %% ../nbs/01_masks.ipynb 26
+from segment_anything import sam_model_registry, SamPredictor
+
+# %% ../nbs/01_masks.ipynb 27
 def show_mask(mask, ax, random_color=False):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
@@ -248,14 +251,14 @@ def show_mask(mask, ax, random_color=False):
     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
     ax.imshow(mask_image)
 
-# %% ../nbs/01_masks.ipynb 27
+# %% ../nbs/01_masks.ipynb 28
 def show_points(coords, labels, ax, marker_size=375):
     pos_points = coords[labels==1]
     neg_points = coords[labels==0]
     ax.scatter(pos_points[:, 0], pos_points[:, 1], color='green', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
     ax.scatter(neg_points[:, 0], neg_points[:, 1], color='red', marker='*', s=marker_size, edgecolor='white', linewidth=1.25)
 
-# %% ../nbs/01_masks.ipynb 38
+# %% ../nbs/01_masks.ipynb 39
 def get_sam_predictor(ckpt_path:str, model_type:str, device:str='cuda'):
     """Returns a SAM predictor object."""
     sys.path.append("..")
@@ -263,7 +266,7 @@ def get_sam_predictor(ckpt_path:str, model_type:str, device:str='cuda'):
     sam.to(device)
     return SamPredictor(sam)
 
-# %% ../nbs/01_masks.ipynb 39
+# %% ../nbs/01_masks.ipynb 40
 def get_sam_mask(image, predictor, input_point: List[List[int]], plot=False):
     """Returns a set of predicted masks for a single input point."""
     input_point = np.array([input_point[0]])
