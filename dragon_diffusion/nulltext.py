@@ -70,23 +70,18 @@ def null_text_inversion(model, scheduler, all_latents, embeddings, inner_steps=1
     uncond_embeddings = uncond_embeddings.detach()
     uncond_embeddings.requires_grad_(True)
 
-    # Initialize the optimizer
+    # optimizer
     optimizer = optim.Adam(
-        [uncond_embeddings],  # only optimize the embeddings
+        [uncond_embeddings],
         lr=lr,
     )
-
-    # step_ratio = pipe.scheduler.config.num_train_timesteps // pipe.scheduler.num_inference_steps
+    
     cond_embeddings = cond_embeddings.detach()
-    # input_embeddings = torch.cat([null_text_embeddings, text_embeddings], dim=0)
-    # extra_step_kwargs = pipe.prepare_extra_step_kwargs(generator, eta)
     results = []
     latents = all_latents[-1].to(device)
     
     for t, prev_latents in progress_bar([(i,j) for i,j in zip(scheduler.timesteps, reversed(all_latents[:-1]))], leave=False, comment='null text optimising...'):
         prev_latents = prev_latents.to(device).detach()
-        
-        # expand the latents if we are doing classifier free guidance
         latent_model_input = scheduler.scale_model_input(latents, t).detach()
         cond = model(latent_model_input, t, encoder_hidden_states=cond_embeddings).sample.detach()
         for _ in progress_bar(range(inner_steps), leave=False):
@@ -107,7 +102,6 @@ def null_text_inversion(model, scheduler, all_latents, embeddings, inner_steps=1
 # %% ../nbs/02_nulltext.ipynb 9
 @torch.no_grad()
 def reconstruct(model, scheduler, latents, cond_embeddings, null_uncond_embeddings, guidance=7.5, generator=None, eta=0.0, device='cuda', vae=None, decode=False):
-    # extra_step_kwargs = pipe.prepare_extra_step_kwargs(generator, eta)
     if decode: assert vae is not None
     latents = latents.to(device)
     for i, (t, null_embed) in enumerate(progress_bar([(i,j) for i, j in zip(scheduler.timesteps, null_uncond_embeddings)], leave=False, comment='reconstructing image...')):
