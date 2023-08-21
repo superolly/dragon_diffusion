@@ -62,7 +62,7 @@ def ddim_inversion(latents, cond_embeddings, scheduler, model):
     return all_latents
 
 # %% ../nbs/02_nulltext.ipynb 7
-def null_text_inversion(model, scheduler, all_latents, embeddings, inner_steps=10, lr=0.01, guidance=7.5, generator=None, device='cuda'):
+def null_text_inversion(model, scheduler, all_latents, embeddings, inner_steps=10, lr=0.05, guidance=7.5, generator=None, device='cuda'):
     cond_embeddings, uncond_embeddings = embeddings.chunk(2)
     
     # set up uncond_embeddings as a parameter
@@ -94,7 +94,7 @@ def null_text_inversion(model, scheduler, all_latents, embeddings, inner_steps=1
             optimizer.step()
             optimizer.zero_grad()
 
-        results.append(cond_embeddings.detach().cpu())
+        results.append(uncond_embeddings.detach().cpu())
         latents = prev_latents_pred.detach()
         
     return all_latents[-1], results

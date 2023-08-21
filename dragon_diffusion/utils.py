@@ -89,10 +89,11 @@ def get_attn_dict(processor, model, attention_type='all', location='all'):
 # %% ../nbs/03_utils.ipynb 12
 class AttnStorage:
     def __init__(self): self.storage = {}
-    def __call__(self, name, key, value): 
-        if not name in self.storage: self.storage[name] = {}
-        self.storage[name]['key'] = key
-        self.storage[name]['value'] = value
+    def __call__(self, name, key, value, emb_type):
+        if not emb_type in self.storage: self.storage[emb_type] = {}
+        if not name in self.storage[emb_type]: self.storage[emb_type][name] = {}
+        self.storage[emb_type][name]['key'] = key
+        self.storage[emb_type][name]['value'] = value
     def flush(self): self.storage = {}
 
 # %% ../nbs/03_utils.ipynb 14
@@ -101,8 +102,9 @@ class CustomAttnProcessor(AttnProcessor):
         fc.store_attr()
         self.store_attention = False
         self.inject_attention = False
-    def set_attention(self, store, inject): 
+    def set_attention(self, store, inject, emb_type='cond'): 
         self.store_attention = store
+        self.emb_type = emb_type
         self.inject_attention = inject
     def __call__(self, attn: Attention, hidden_states, encoder_hidden_states=None, attention_mask=None):
         batch_size, sequence_length, _ = (
@@ -123,11 +125,11 @@ class CustomAttnProcessor(AttnProcessor):
         key = attn.head_to_batch_dim(key)
         value = attn.head_to_batch_dim(value)
         
-        if self.store_attention: self.attn_storage(self.name, key, value) ## stores the key and value matrices
+        if self.store_attention: self.attn_storage(self.name, key, value, self.emb_type) ## store key and value matrices
         
-        if self.inject_attention: ## enables injection of corresponding key and value matrices
-            key = self.attn_storage.storage[self.name]['key']
-            value = self.attn_storage.storage[self.name]['value']
+        if self.inject_attention: ## inject corresponding key and value matrices
+            key = self.attn_storage.storage[self.emb_type][self.name]['key']
+            value = self.attn_storage.storage[self.emb_type][self.name]['value']
         
         attention_probs = attn.get_attention_scores(query, key, attention_mask)
         attention_probs.requires_grad_(True)
@@ -143,7 +145,8 @@ class CustomAttnProcessor(AttnProcessor):
         return hidden_states
 
 # %% ../nbs/03_utils.ipynb 16
-def prepare_attention(model, attn_storage, set_store=False, set_inject=False):
+def prepare_attention(model, attn_storage, set_store=False, set_inject=False, emb_type='cond'):
+    assert emb_type in ['cond', 'uncond']
     assert not (set_store is True and set_inject is True)
     for name, module in model.attn_processors.items(): 
-        if "CustomAttnProcessor" in module.__class__.__name__: module.set_attention(set_store, set_inject)
+        if "CustomAttnProcessor" in module.__class__.__name__: module.set_attention(set_store, set_inject, emb_type)
